@@ -251,14 +251,16 @@ const SOLD_STAGES = ['active'];
 const PROSPECT_STAGES = ['lead','contacted','proposal','neg'];
 
 let currentUser = null;
-// ── EDIT THESE THREE VALUES THEN SAVE THE FILE ──────────
-const AT_TOKEN = 'patJdfVooaxWOVnbb';
+// ── REPLACE THE TOKEN VALUE BELOW WITH YOUR pat… TOKEN ──
+const AT_TOKEN = 'PASTE_YOUR_PAT_TOKEN_HERE';
+// ────────────────────────────────────────────────────────
 const AT_BASE  = 'app8wJ4oEEG0ne3TD';
 const AT_TABLE = 'Clients';
-// ─────────────────────────────────────────────────────────
-let atConfig = (AT_TOKEN !== 'patJdfVooaxWOVnbb')
+const _hasToken = AT_TOKEN.startsWith('pat');
+let atConfig = _hasToken
   ? { key: AT_TOKEN, base: AT_BASE, table: AT_TABLE }
   : JSON.parse(localStorage.getItem('rr_at_config') || 'null');
+if(_hasToken){ document.addEventListener('DOMContentLoaded', ()=>{ const b=document.getElementById('config-banner'); if(b) b.style.display='none'; }); }
 let cards = JSON.parse(localStorage.getItem('rr_cards') || 'null') || [
   { id:'demo1',  name:'Akenza',          opportunity:'Fractional / retainer renewal', contact:'Jonas',              stage:'neg',       owner:'RR', lastContact:'2025-04-15', nextAction:'Talk with Jonas Monday 27.4',               projectedValue:'',      soldValue:'17200' },
   { id:'demo2',  name:'Vaisala',         opportunity:'Content / brand',               contact:'Rasmus Stoltzenberg',stage:'contacted', owner:'RR', lastContact:'2025-04-16', nextAction:'After brief: budget, concept deck, timeline', projectedValue:'',      soldValue:'' },
