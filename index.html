@@ -252,11 +252,11 @@ const PROSPECT_STAGES = ['lead','contacted','proposal','neg'];
 
 let currentUser = null;
 // ── EDIT THESE THREE VALUES THEN SAVE THE FILE ──────────
-const AT_TOKEN = 'PASTE_YOUR_PAT_TOKEN_HERE'; patJdfVooaxWOVnbb
+const AT_TOKEN = 'patJdfVooaxWOVnbb'; 
 const AT_BASE  = 'app8wJ4oEEG0ne3TD';
 const AT_TABLE = 'Clients';
 // ─────────────────────────────────────────────────────────
-let atConfig = (AT_TOKEN !== 'PASTE_YOUR_PAT_TOKEN_HERE')
+let atConfig = (AT_TOKEN !== 'patJdfVooaxWOVnbb')
   ? { key: AT_TOKEN, base: AT_BASE, table: AT_TABLE }
   : JSON.parse(localStorage.getItem('rr_at_config') || 'null');
 let cards = JSON.parse(localStorage.getItem('rr_cards') || 'null') || [
