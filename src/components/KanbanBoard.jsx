@@ -32,18 +32,17 @@ export function fmtEur(v) {
 }
 
 export default function KanbanBoard({ session }) {
-  const [deals, setDeals]       = useState([])
-  const [modal, setModal]       = useState(null) // { type: 'add'|'edit'|'detail', deal?, stage? }
-  const [dragId, setDragId]     = useState(null)
+  const [deals, setDeals]           = useState([])
+  const [modal, setModal]           = useState(null)
+  const [dragId, setDragId]         = useState(null)
+  const [activeStage, setActiveStage] = useState(STAGES[0].id)
 
-  // ── Identify current user by email ──
   const email = session.user.email
   const currentOwner = email.toLowerCase().includes('henrik') ? 'Henrik Axlund'
                       : email.toLowerCase().includes('riina')  ? 'Riina Rinkinen'
                       : OWNERS[0]
   const ownerStyle = OWNER_STYLES[currentOwner] || OWNER_STYLES['Henrik Axlund']
 
-  // ── Fetch deals ──
   const fetchDeals = useCallback(async () => {
     const { data, error } = await supabase
       .from('deals')
@@ -54,17 +53,13 @@ export default function KanbanBoard({ session }) {
 
   useEffect(() => {
     fetchDeals()
-
-    // Real-time subscription
     const channel = supabase
       .channel('deals-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, fetchDeals)
       .subscribe()
-
     return () => supabase.removeChannel(channel)
   }, [fetchDeals])
 
-  // ── CRUD ──
   async function createDeal(fields) {
     const { error } = await supabase.from('deals').insert([fields])
     if (error) alert('Error saving deal: ' + error.message)
@@ -88,7 +83,6 @@ export default function KanbanBoard({ session }) {
     setModal(null)
   }
 
-  // ── Drag and drop ──
   function onDragStart(id) { setDragId(id) }
 
   async function onDrop(stage) {
@@ -97,37 +91,50 @@ export default function KanbanBoard({ session }) {
     setDragId(null)
   }
 
-  // ── Logout ──
   async function handleLogout() {
     await supabase.auth.signOut()
   }
+
+  const activeStageObj = STAGES.find(s => s.id === activeStage)
 
   return (
     <div>
       {/* Topbar */}
       <div className="topbar">
         <div className="topbar-logo">Techno<span> Beat</span></div>
-
         <div className="topbar-user">
-          <div
-            className="avatar"
-            style={{ background: ownerStyle.bg, color: ownerStyle.color }}
-          >
+          <div className="avatar" style={{ background: ownerStyle.bg, color: ownerStyle.color }}>
             {ownerStyle.initials}
           </div>
-          <span>{currentOwner}</span>
+          <span className="topbar-name">{currentOwner}</span>
           <button className="logout-btn" onClick={handleLogout}>Sign out</button>
         </div>
-
-        <button className="add-btn-top" onClick={() => setModal({ type: 'add' })}>
-          + Add lead
+        <button className="add-btn-top" onClick={() => setModal({ type: 'add', stage: activeStage })}>
+          + Add
         </button>
       </div>
 
       {/* Stats */}
       <StatsBar deals={deals} />
 
-      {/* Board */}
+      {/* Mobile stage tabs */}
+      <div className="stage-tabs">
+        {STAGES.map(stage => (
+          <button
+            key={stage.id}
+            className={`stage-tab${activeStage === stage.id ? ' active' : ''}`}
+            style={activeStage === stage.id ? { background: stage.bg, color: stage.color } : {}}
+            onClick={() => setActiveStage(stage.id)}
+          >
+            {stage.id}
+            <span className="stage-tab-count">
+              {deals.filter(d => d.stage === stage.id).length}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Board — desktop shows all columns, mobile shows active only */}
       <div className="board-wrap">
         <div className="board">
           {STAGES.map(stage => (
@@ -140,12 +147,12 @@ export default function KanbanBoard({ session }) {
               onDragStart={onDragStart}
               onDrop={onDrop}
               dragId={dragId}
+              isMobileActive={activeStage === stage.id}
             />
           ))}
         </div>
       </div>
 
-      {/* Modal — re-resolve deal from live deals array so data is always fresh */}
       {modal && (
         <DealModal
           modal={modal.type === 'detail'

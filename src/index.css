@@ -385,3 +385,69 @@ body {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-med); border-radius: 3px; }
+
+/* ── STAGE TABS (mobile only) ── */
+.stage-tabs {
+  display: none;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 12px 16px 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.stage-tabs::-webkit-scrollbar { display: none; }
+
+.stage-tab {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-med);
+  background: var(--surface); color: var(--text2);
+  cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; gap: 5px;
+}
+.stage-tab.active { border-color: transparent; }
+.stage-tab-count {
+  font-size: 10px; opacity: 0.7;
+  background: rgba(0,0,0,0.08);
+  border-radius: 8px; padding: 0 5px;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 640px) {
+  /* Topbar */
+  .topbar { padding: 0 14px; gap: 8px; }
+  .topbar-name { display: none; }
+  .add-btn-top { padding: 7px 12px; font-size: 12px; }
+  .logout-btn { padding: 4px 6px; }
+
+  /* Stats */
+  .stats-bar { padding: 12px 16px 0; gap: 8px; flex-wrap: nowrap; }
+  .stat-card { padding: 10px 14px; min-width: 110px; }
+  .stat-value { font-size: 16px; }
+
+  /* Show tabs, hide desktop board */
+  .stage-tabs { display: flex; }
+
+  .board-wrap { padding: 12px 16px 24px; overflow-x: visible; }
+  .board { flex-direction: column; min-width: unset; gap: 0; }
+
+  /* Hide all columns on mobile, show only active */
+  .col { display: none; width: 100%; }
+  .col.mobile-active { display: flex; }
+
+  /* Modal full-screen on mobile */
+  .overlay { align-items: flex-end; }
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+    padding: 20px 18px;
+  }
+  .detail-modal { width: 100%; }
+  .form-row { flex-direction: column; gap: 0; }
+}
