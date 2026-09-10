@@ -1,8 +1,8 @@
-export default function StatsBar({ deals }) {
+export default function StatsBar({ deals, soldTotal = 0 }) {
   const active    = deals.filter(d => d.stage === 'Active client')
   const pipeline  = deals.filter(d => !['Active client', 'Archived'].includes(d.stage))
 
-  const soldVal = active.reduce((s, d) => s + (parseFloat(d.sold_value) || 0), 0)
+  const soldVal = soldTotal // sum of all delivered project values
   const projVal = pipeline.reduce((s, d) => s + (parseFloat(d.projected_value) || 0), 0)
 
   function fmt(n) {

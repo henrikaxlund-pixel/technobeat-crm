@@ -1,77 +1,48 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { STAGES, OWNERS, OWNER_STYLES, fmtDate, fmtEur } from './KanbanBoard'
+import { STAGES, OWNERS, OWNER_STYLES, ENGAGEMENT_TYPES, fmtDate, fmtEur } from './KanbanBoard'
 
-// ── Value fields shown depend on stage ──
-function ValueFields({ stage, projectedValue, soldValue, onChange }) {
-  const isActive   = stage === 'Active client'
-  const isProspect = ['Lead', 'Contacted', 'Proposal sent', 'Negotiation'].includes(stage)
+const PROSPECT_STAGES = ['Lead', 'Contacted', 'Proposal sent', 'Negotiation']
 
-  if (isActive) return (
+// ── Projected value (prospects only; clients get value from projects) ──
+function ValueFields({ stage, projectedValue, onChange }) {
+  if (!PROSPECT_STAGES.includes(stage)) return null
+  return (
     <div className="value-section">
-      <div className="value-section-title">Value</div>
-      <div className="form-row">
-        <div className="form-group">
-          <label>Projected value (€)</label>
-          <input type="number" min="0" value={projectedValue}
-            onChange={e => onChange('projected_value', e.target.value)}
-            placeholder="Original estimate" />
-          <div className="form-hint">Your estimate before signing</div>
-        </div>
-        <div className="form-group">
-          <label>Sold value (€)</label>
-          <input type="number" min="0" value={soldValue}
-            onChange={e => onChange('sold_value', e.target.value)}
-            placeholder="Confirmed amount" />
-          <div className="form-hint">The signed amount</div>
-        </div>
-      </div>
-    </div>
-  )
-
-  if (isProspect) return (
-    <div className="value-section">
-      <div className="value-section-title">Value</div>
+      <div className="value-section-title">Projected value</div>
       <div className="form-group">
-        <label>Projected value (€)</label>
+        <label>Estimated value (€)</label>
         <input type="number" min="0" value={projectedValue}
-          onChange={e => onChange('projected_value', e.target.value)}
-          placeholder="e.g. 15000" />
+          onChange={e => onChange('projected_value', e.target.value)} placeholder="e.g. 15000" />
         <div className="form-hint">Best estimate of what this could be worth</div>
       </div>
     </div>
   )
-
-  return null
 }
 
 // ── Add / Edit form ──
 function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies = [] }) {
   const [fields, setFields] = useState({
-    company:         initial?.company         ?? initial?.client_name ?? '',
-    opportunity:     initial?.opportunity     ?? '',
     contact_person:  initial?.contact_person  ?? '',
-    engagement_type: initial?.engagement_type ?? '',
-    owner:           initial?.owner           ?? currentOwner,
-    stage:           initial?.stage           ?? 'Lead',
-    last_contacted:  initial?.last_contacted  ?? '',
-    next_action:     initial?.next_action     ?? '',
-    projected_value: initial?.projected_value ?? '',
-    sold_value:      initial?.sold_value      ?? '',
+    company:         initial?.company          ?? initial?.client_name ?? '',
+    engagement_type: initial?.engagement_type  ?? '',
+    opportunity:     initial?.opportunity      ?? '',
+    owner:           initial?.owner            ?? currentOwner,
+    stage:           initial?.stage            ?? 'Lead',
+    last_contacted:  initial?.last_contacted   ?? '',
+    next_action:     initial?.next_action      ?? '',
+    projected_value: initial?.projected_value  ?? '',
   })
   const [saving, setSaving] = useState(false)
 
   function set(key, val) { setFields(f => ({ ...f, [key]: val })) }
 
-  // Reset value fields when stage changes
   function handleStageChange(newStage) {
-    const isNowActive   = newStage === 'Active client'
-    const isNowProspect = ['Lead', 'Contacted', 'Proposal sent', 'Negotiation'].includes(newStage)
     setFields(f => ({
       ...f,
       stage:           newStage,
-      sold_value:      isNowActive   ? f.sold_value : '',
-      projected_value: isNowProspect || isNowActive ? f.projected_value : '',
+      // Projected value only applies while it's still a prospect.
+      projected_value: PROSPECT_STAGES.includes(newStage) ? f.projected_value : '',
     }))
   }
 
@@ -83,8 +54,8 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies =
       ...fields,
       company:         fields.company.trim(),
       client_name:     fields.company.trim(), // keep legacy headline in sync
+      engagement_type: fields.engagement_type || null,
       projected_value: fields.projected_value !== '' ? parseFloat(fields.projected_value) : null,
-      sold_value:      fields.sold_value      !== '' ? parseFloat(fields.sold_value)      : null,
       last_contacted:  fields.last_contacted  || null,
     }
     await onSave(payload)
@@ -94,8 +65,13 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies =
   return (
     <form onSubmit={handleSubmit}>
       <div className="form-group">
+        <label>Contact person</label>
+        <input type="text" value={fields.contact_person} autoFocus
+          onChange={e => set('contact_person', e.target.value)} placeholder="e.g. Hina Atta" />
+      </div>
+      <div className="form-group">
         <label>Company</label>
-        <input type="text" value={fields.company} autoFocus required list="company-list"
+        <input type="text" value={fields.company} required list="company-list"
           onChange={e => set('company', e.target.value)} placeholder="e.g. ICEYE" />
         {companies.length > 0 && (
           <datalist id="company-list">
@@ -105,26 +81,16 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies =
         <div className="form-hint">Contacts sharing a company are grouped together</div>
       </div>
       <div className="form-group">
-        <label>Contact person</label>
-        <input type="text" value={fields.contact_person}
-          onChange={e => set('contact_person', e.target.value)} placeholder="e.g. Hina Atta" />
+        <label>Engagement type</label>
+        <select value={fields.engagement_type} onChange={e => set('engagement_type', e.target.value)}>
+          <option value="">—</option>
+          {ENGAGEMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
       </div>
       <div className="form-group">
-        <label>Opportunity / project</label>
+        <label>Opportunity / note</label>
         <input type="text" value={fields.opportunity}
           onChange={e => set('opportunity', e.target.value)} placeholder="e.g. Website redesign" />
-      </div>
-      <div className="form-group">
-        <label>Engagement type</label>
-        <input type="text" value={fields.engagement_type} list="engagement-list"
-          onChange={e => set('engagement_type', e.target.value)}
-          placeholder="e.g. Project based / Fractional" />
-        <datalist id="engagement-list">
-          <option value="Project based" />
-          <option value="Fractional" />
-          <option value="Project based / Fractional" />
-          <option value="Retainer" />
-        </datalist>
       </div>
 
       <div className="form-row">
@@ -145,9 +111,14 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies =
       <ValueFields
         stage={fields.stage}
         projectedValue={fields.projected_value ?? ''}
-        soldValue={fields.sold_value ?? ''}
         onChange={set}
       />
+
+      {fields.stage === 'Active client' && (
+        <div className="form-hint" style={{ margin: '-2px 0 12px' }}>
+          Log delivered projects & their value from the client's detail view after saving.
+        </div>
+      )}
 
       <div className="form-group">
         <label>Last contacted</label>
@@ -164,26 +135,95 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies =
       <div className="modal-actions">
         <button type="button" className="btn-cancel" onClick={onCancel}>Cancel</button>
         <button type="submit" className="btn-save" disabled={saving}>
-          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add lead'}
+          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add contact'}
         </button>
       </div>
     </form>
   )
 }
 
+// ── Project history (company-level, shown in the detail view) ──
+function ProjectHistory({ company, projects, onAdd, onDelete }) {
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState({ name: '', value: '', year: '' })
+  const total = projects.reduce((s, p) => s + (parseFloat(p.value) || 0), 0)
+
+  function submit(e) {
+    e.preventDefault()
+    if (!draft.name.trim()) return
+    onAdd(company, {
+      name:  draft.name.trim(),
+      value: draft.value !== '' ? parseFloat(draft.value) : 0,
+      year:  draft.year  !== '' ? parseInt(draft.year, 10) : null,
+    })
+    setDraft({ name: '', value: '', year: '' })
+    setAdding(false)
+  }
+
+  return (
+    <>
+      <div className="section-label" style={{ marginTop: 14 }}>Project history</div>
+
+      {projects.length === 0 && !adding && (
+        <div className="proj-empty">No projects logged yet.</div>
+      )}
+
+      {projects.length > 0 && (
+        <div className="proj-list">
+          {projects.map(p => (
+            <div className="proj-row" key={p.id}>
+              <div className="proj-main">
+                <span className="proj-name">{p.name}</span>
+                {p.year && <span className="proj-year">{p.year}</span>}
+              </div>
+              <div className="proj-right">
+                <span className="proj-value">{fmtEur(p.value) || '€0'}</span>
+                <button className="proj-del" onClick={() => onDelete(p.id)} title="Remove project">×</button>
+              </div>
+            </div>
+          ))}
+          <div className="proj-total">
+            <span>Total value</span>
+            <span>{fmtEur(total) || '€0'}</span>
+          </div>
+        </div>
+      )}
+
+      {adding ? (
+        <form className="proj-add-form" onSubmit={submit}>
+          <input autoFocus placeholder="Project name" value={draft.name}
+            onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
+          <div className="proj-add-row">
+            <input type="number" min="0" placeholder="€ value" value={draft.value}
+              onChange={e => setDraft(d => ({ ...d, value: e.target.value }))} />
+            <input type="number" placeholder="Year" value={draft.year}
+              onChange={e => setDraft(d => ({ ...d, year: e.target.value }))} />
+          </div>
+          <div className="proj-add-actions">
+            <button type="button" className="btn-cancel" onClick={() => { setAdding(false); setDraft({ name: '', value: '', year: '' }) }}>Cancel</button>
+            <button type="submit" className="btn-save">Add project</button>
+          </div>
+        </form>
+      ) : (
+        <button className="add-here" style={{ marginTop: 6 }} onClick={() => setAdding(true)}>+ Add project</button>
+      )}
+    </>
+  )
+}
+
 // ── Detail view ──
-function DealDetail({ deal, onClose, onEdit, onMove, onDelete }) {
+function DealDetail({ deal, projects, onClose, onEdit, onMove, onDelete, onAddProject, onDeleteProject }) {
   const stage      = STAGES.find(s => s.id === deal.stage) || STAGES[0]
   const ownerStyle = OWNER_STYLES[deal.owner] || OWNER_STYLES['Henrik Axlund']
   const others     = STAGES.filter(s => s.id !== deal.stage)
   const pv = fmtEur(deal.projected_value)
-  const sv = fmtEur(deal.sold_value)
 
   return (
     <>
       <div className="detail-flex">
         <div className="detail-header">
           <div className="detail-name">{deal.company || deal.client_name}</div>
+          {deal.contact_person && <div className="detail-contact">{deal.contact_person}</div>}
           {deal.opportunity && <div className="detail-opp">{deal.opportunity}</div>}
           <span
             className="detail-stage-pill"
@@ -196,10 +236,6 @@ function DealDetail({ deal, onClose, onEdit, onMove, onDelete }) {
       </div>
 
       <div className="field-list">
-        <div className="field-item">
-          <span className="fi-label">Contact</span>
-          <span className="fi-val">{deal.contact_person || '—'}</span>
-        </div>
         {deal.engagement_type && (
           <div className="field-item">
             <span className="fi-label">Engagement</span>
@@ -224,20 +260,12 @@ function DealDetail({ deal, onClose, onEdit, onMove, onDelete }) {
         </div>
       </div>
 
-      {(pv || sv) && (
+      {pv && (
         <div className="value-panel">
-          {pv && (
-            <div className="value-box projected">
-              <div className="value-box-label">Projected</div>
-              <div className="value-box-amount">{pv}</div>
-            </div>
-          )}
-          {sv && (
-            <div className="value-box sold">
-              <div className="value-box-label">Sold</div>
-              <div className="value-box-amount">{sv}</div>
-            </div>
-          )}
+          <div className="value-box projected">
+            <div className="value-box-label">Projected</div>
+            <div className="value-box-amount">{pv}</div>
+          </div>
         </div>
       )}
 
@@ -247,6 +275,13 @@ function DealDetail({ deal, onClose, onEdit, onMove, onDelete }) {
           <div className="next-action-box">→ {deal.next_action}</div>
         </>
       )}
+
+      <ProjectHistory
+        company={deal.company || deal.client_name}
+        projects={projects}
+        onAdd={onAddProject}
+        onDelete={onDeleteProject}
+      />
 
       <div className="section-label" style={{ marginTop: 14 }}>Move to stage</div>
       <div className="move-grid">
@@ -266,7 +301,10 @@ function DealDetail({ deal, onClose, onEdit, onMove, onDelete }) {
 }
 
 // ── Root modal wrapper ──
-export default function DealModal({ modal, currentOwner, companies = [], onClose, onCreate, onUpdate, onMove, onDelete }) {
+export default function DealModal({
+  modal, currentOwner, companies = [], projects = [],
+  onClose, onCreate, onUpdate, onMove, onDelete, onAddProject, onDeleteProject,
+}) {
   const [view, setView] = useState(modal.type) // 'add' | 'edit' | 'detail'
   const [editDeal, setEditDeal] = useState(modal.deal || null)
 
@@ -276,7 +314,11 @@ export default function DealModal({ modal, currentOwner, companies = [], onClose
   }
 
   const isDetail = view === 'detail'
-  const title = view === 'add' ? 'New lead' : view === 'edit' ? `Edit — ${editDeal?.client_name}` : null
+  const dealCompany = modal.deal?.company || modal.deal?.client_name
+  const companyProjects = projects.filter(p => p.company === dealCompany)
+  const title = view === 'add' ? 'New contact'
+              : view === 'edit' ? `Edit — ${editDeal?.company || editDeal?.client_name}`
+              : null
 
   return createPortal(
     <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -308,10 +350,13 @@ export default function DealModal({ modal, currentOwner, companies = [], onClose
         {view === 'detail' && modal.deal && (
           <DealDetail
             deal={modal.deal}
+            projects={companyProjects}
             onClose={onClose}
             onEdit={handleEdit}
             onMove={onMove}
             onDelete={onDelete}
+            onAddProject={onAddProject}
+            onDeleteProject={onDeleteProject}
           />
         )}
       </div>

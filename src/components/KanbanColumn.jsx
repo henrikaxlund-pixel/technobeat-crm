@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import DealCard from './DealCard'
 
-export default function KanbanColumn({ stage, deals, onAddDeal, onOpenDeal, onDragStart, onDrop, dragId, isMobileActive }) {
+export default function KanbanColumn({ stage, deals, onAddDeal, onOpenDeal, onDragStart, onDrop, dragId, companyTotals = {}, isMobileActive }) {
   const [over, setOver] = useState(false)
 
   function handleDragOver(e) {
@@ -36,6 +36,7 @@ export default function KanbanColumn({ stage, deals, onAddDeal, onOpenDeal, onDr
           <DealCard
             key={deal.id}
             deal={deal}
+            companyTotal={companyTotals[deal.company || deal.client_name] || 0}
             onClick={() => onOpenDeal(deal)}
             onDragStart={() => onDragStart(deal.id)}
             isDragging={dragId === deal.id}

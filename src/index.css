@@ -328,7 +328,46 @@ body {
 .detail-modal { width: 420px; }
 .detail-header { margin-bottom: 14px; }
 .detail-name { font-size: 20px; font-weight: 600; margin-bottom: 3px; }
+.detail-contact { font-size: 13px; color: var(--text); margin-bottom: 4px; }
 .detail-opp  { font-size: 13px; color: var(--text2); font-style: italic; margin-bottom: 8px; }
+
+/* ── PROJECT HISTORY ── */
+.proj-empty { font-size: 12px; color: var(--text3); padding: 4px 0 2px; }
+.proj-list { display: flex; flex-direction: column; gap: 6px; }
+.proj-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--surface2); border-radius: var(--radius-sm); padding: 8px 11px;
+}
+.proj-main { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.proj-name { font-size: 13px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proj-year { font-size: 11px; color: var(--text3); flex-shrink: 0; }
+.proj-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.proj-value { font-size: 13px; font-weight: 600; color: var(--green); }
+.proj-del {
+  background: none; border: none; cursor: pointer; color: var(--text3);
+  font-size: 16px; line-height: 1; padding: 0 2px; transition: color 0.12s;
+}
+.proj-del:hover { color: var(--red); }
+.proj-total {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 11px 2px; font-size: 13px; font-weight: 600; color: var(--text);
+  border-top: 1px solid var(--border); margin-top: 2px;
+}
+.proj-add-form {
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--surface2); border-radius: var(--radius-sm);
+  padding: 12px; margin-top: 6px;
+}
+.proj-add-form input {
+  width: 100%; padding: 8px 10px;
+  border: 1px solid var(--border-med); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 13px; color: var(--text);
+  background: var(--surface); outline: none; transition: border-color 0.15s;
+}
+.proj-add-form input:focus { border-color: var(--accent); }
+.proj-add-row { display: flex; gap: 8px; }
+.proj-add-row input { flex: 1; }
+.proj-add-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 .detail-stage-pill {
   font-size: 10px; font-weight: 600; text-transform: uppercase;

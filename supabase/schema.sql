@@ -55,3 +55,29 @@ create policy "Authenticated users can delete"  on deals for delete  to authenti
 
 -- Enable realtime so both users see changes instantly
 alter publication supabase_realtime add table deals;
+
+-- ── PROJECTS ──
+-- Work delivered for a company. Linked to deals by the `company` text value,
+-- so project history is shared across every contact at that company.
+-- engagement_type on deals is one of: 'Project', 'Fractional', 'Both'.
+create table if not exists projects (
+  id          uuid          default gen_random_uuid() primary key,
+  created_at  timestamptz   default now(),
+  company     text          not null,
+  name        text          not null,
+  value       numeric(12,2) default 0,
+  year        int,
+  notes       text
+);
+create index if not exists projects_company_idx on projects (company);
+
+alter table projects enable row level security;
+
+do $$ begin
+  create policy "Authenticated users manage projects"
+    on projects for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  alter publication supabase_realtime add table projects;
+exception when duplicate_object then null; end $$;

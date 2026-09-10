@@ -15,6 +15,8 @@ export const STAGES = [
 
 export const OWNERS = ['Henrik Axlund', 'Riina Rinkinen']
 
+export const ENGAGEMENT_TYPES = ['Project', 'Fractional', 'Both']
+
 export const OWNER_STYLES = {
   'Henrik Axlund':  { bg: '#EAF1F8', color: '#2C5F8A', initials: 'HA' },
   'Riina Rinkinen': { bg: '#E6F4EE', color: '#1A6B4A', initials: 'RR' },
@@ -33,6 +35,7 @@ export function fmtEur(v) {
 
 export default function KanbanBoard({ session }) {
   const [deals, setDeals]           = useState([])
+  const [projects, setProjects]     = useState([])
   const [modal, setModal]           = useState(null)
   const [dragId, setDragId]         = useState(null)
   const [activeStage, setActiveStage] = useState(STAGES[0].id)
@@ -51,14 +54,24 @@ export default function KanbanBoard({ session }) {
     if (!error) setDeals(data)
   }, [])
 
+  const fetchProjects = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .order('year', { ascending: false, nullsFirst: false })
+    if (!error) setProjects(data)
+  }, [])
+
   useEffect(() => {
     fetchDeals()
+    fetchProjects()
     const channel = supabase
-      .channel('deals-changes')
+      .channel('crm-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, fetchDeals)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, fetchProjects)
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [fetchDeals])
+  }, [fetchDeals, fetchProjects])
 
   async function createDeal(fields) {
     const { error } = await supabase.from('deals').insert([fields])
@@ -83,6 +96,16 @@ export default function KanbanBoard({ session }) {
     setModal(null)
   }
 
+  async function addProject(company, fields) {
+    const { error } = await supabase.from('projects').insert([{ company, ...fields }])
+    if (error) alert('Error saving project: ' + error.message)
+  }
+
+  async function deleteProject(id) {
+    if (!confirm('Remove this project?')) return
+    await supabase.from('projects').delete().eq('id', id)
+  }
+
   function onDragStart(id) { setDragId(id) }
 
   async function onDrop(stage) {
@@ -97,6 +120,13 @@ export default function KanbanBoard({ session }) {
 
   const activeStageObj = STAGES.find(s => s.id === activeStage)
   const companies = [...new Set(deals.map(d => d.company || d.client_name).filter(Boolean))].sort()
+
+  // Sum of delivered project value per company (feeds cards + stats).
+  const companyTotals = projects.reduce((acc, p) => {
+    acc[p.company] = (acc[p.company] || 0) + (parseFloat(p.value) || 0)
+    return acc
+  }, {})
+  const soldTotal = Object.values(companyTotals).reduce((s, v) => s + v, 0)
 
   return (
     <div>
@@ -116,7 +146,7 @@ export default function KanbanBoard({ session }) {
       </div>
 
       {/* Stats */}
-      <StatsBar deals={deals} />
+      <StatsBar deals={deals} soldTotal={soldTotal} />
 
       {/* Mobile stage tabs */}
       <div className="stage-tabs">
@@ -148,6 +178,7 @@ export default function KanbanBoard({ session }) {
               onDragStart={onDragStart}
               onDrop={onDrop}
               dragId={dragId}
+              companyTotals={companyTotals}
               isMobileActive={activeStage === stage.id}
             />
           ))}
@@ -161,11 +192,14 @@ export default function KanbanBoard({ session }) {
             : modal}
           currentOwner={currentOwner}
           companies={companies}
+          projects={projects}
           onClose={() => setModal(null)}
           onCreate={createDeal}
           onUpdate={updateDeal}
           onMove={moveDeal}
           onDelete={deleteDeal}
+          onAddProject={addProject}
+          onDeleteProject={deleteProject}
         />
       )}
     </div>

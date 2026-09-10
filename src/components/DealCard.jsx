@@ -1,10 +1,10 @@
 import { OWNER_STYLES, fmtDate, fmtEur } from './KanbanBoard'
 
-export default function DealCard({ deal, onClick, onDragStart, isDragging }) {
+export default function DealCard({ deal, companyTotal = 0, onClick, onDragStart, isDragging }) {
   const ownerStyle = OWNER_STYLES[deal.owner] || OWNER_STYLES['Henrik Axlund']
   const isActive   = deal.stage === 'Active client'
   const pv = fmtEur(deal.projected_value)
-  const sv = fmtEur(deal.sold_value)
+  const sold = fmtEur(companyTotal)
 
   return (
     <div
@@ -21,8 +21,8 @@ export default function DealCard({ deal, onClick, onDragStart, isDragging }) {
       <div className="card-row">
         <span className="card-date">{fmtDate(deal.last_contacted)}</span>
         <div className="card-badges">
-          {isActive && sv
-            ? <span className="badge-sold">{sv}</span>
+          {isActive && sold
+            ? <span className="badge-sold">{sold}</span>
             : pv
               ? <span className="badge-projected">~{pv}</span>
               : null}
