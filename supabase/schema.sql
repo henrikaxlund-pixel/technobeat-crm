@@ -32,6 +32,14 @@ update deals set company = client_name where company is null;
 -- Index to make company grouping/filtering fast.
 create index if not exists deals_company_idx on deals (company);
 
+-- Manual priority ordering within a stage (drag-to-reorder, persisted).
+alter table deals add column if not exists position double precision;
+with ordered as (
+  select id, row_number() over (order by created_at) as rn from deals
+)
+update deals d set position = o.rn from ordered o where d.id = o.id and d.position is null;
+create index if not exists deals_position_idx on deals (position);
+
 -- Auto-update updated_at on row changes
 create or replace function update_updated_at()
 returns trigger language plpgsql as $$

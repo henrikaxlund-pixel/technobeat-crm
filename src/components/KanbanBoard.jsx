@@ -39,6 +39,13 @@ export default function KanbanBoard({ session }) {
   const [modal, setModal]           = useState(null)
   const [dragId, setDragId]         = useState(null)
   const [activeStage, setActiveStage] = useState(STAGES[0].id)
+  const [ownerFilter, setOwnerFilter] = useState(() => {
+    try { return localStorage.getItem('tb_owner_filter') || 'all' } catch { return 'all' }
+  })
+
+  useEffect(() => {
+    try { localStorage.setItem('tb_owner_filter', ownerFilter) } catch { /* ignore */ }
+  }, [ownerFilter])
 
   const email = session.user.email
   const currentOwner = email.toLowerCase().includes('henrik') ? 'Henrik Axlund'
@@ -50,6 +57,7 @@ export default function KanbanBoard({ session }) {
     const { data, error } = await supabase
       .from('deals')
       .select('*')
+      .order('position', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true })
     if (!error) setDeals(data)
   }, [])
@@ -74,7 +82,9 @@ export default function KanbanBoard({ session }) {
   }, [fetchDeals, fetchProjects])
 
   async function createDeal(fields) {
-    const { error } = await supabase.from('deals').insert([fields])
+    // New cards go to the bottom of their column.
+    const maxPos = deals.reduce((m, d) => Math.max(m, d.position ?? 0), 0)
+    const { error } = await supabase.from('deals').insert([{ ...fields, position: maxPos + 1 }])
     if (error) alert('Error saving deal: ' + error.message)
     else setModal(null)
   }
@@ -108,10 +118,36 @@ export default function KanbanBoard({ session }) {
 
   function onDragStart(id) { setDragId(id) }
 
-  async function onDrop(stage) {
+  // Drop a dragged card into `targetStage`, positioned just before `beforeId`
+  // (or at the end when beforeId is null). Persists the new order.
+  async function reorderDeal(targetStage, beforeId) {
     if (!dragId) return
-    await moveDeal(dragId, stage)
+    const draggedId = dragId
     setDragId(null)
+    if (beforeId === draggedId) return
+
+    const stageDeals = deals
+      .filter(d => d.stage === targetStage && d.id !== draggedId)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+
+    let idx = beforeId ? stageDeals.findIndex(d => d.id === beforeId) : stageDeals.length
+    if (idx < 0) idx = stageDeals.length
+    const prev = stageDeals[idx - 1]
+    const next = stageDeals[idx]
+
+    let newPos
+    if (!prev && !next)      newPos = 1
+    else if (!prev)          newPos = (next.position ?? 1) - 1
+    else if (!next)          newPos = (prev.position ?? 0) + 1
+    else                     newPos = ((prev.position ?? 0) + (next.position ?? 0)) / 2
+
+    // Optimistic update so it feels instant; realtime will reconcile.
+    setDeals(ds => ds.map(d => d.id === draggedId ? { ...d, stage: targetStage, position: newPos } : d))
+    const { error } = await supabase
+      .from('deals')
+      .update({ stage: targetStage, position: newPos })
+      .eq('id', draggedId)
+    if (error) { alert('Error reordering: ' + error.message); fetchDeals() }
   }
 
   async function handleLogout() {
@@ -120,6 +156,9 @@ export default function KanbanBoard({ session }) {
 
   const activeStageObj = STAGES.find(s => s.id === activeStage)
   const companies = [...new Set(deals.map(d => d.company || d.client_name).filter(Boolean))].sort()
+
+  // Owner filter — lets each person focus on just their own pipeline.
+  const visibleDeals = ownerFilter === 'all' ? deals : deals.filter(d => d.owner === ownerFilter)
 
   // Sum of delivered project value per company (feeds cards + stats).
   const companyTotals = projects.reduce((acc, p) => {
@@ -146,7 +185,23 @@ export default function KanbanBoard({ session }) {
       </div>
 
       {/* Stats */}
-      <StatsBar deals={deals} soldTotal={soldTotal} />
+      <StatsBar deals={visibleDeals} soldTotal={soldTotal} />
+
+      {/* Owner filter */}
+      <div className="filter-bar">
+        <span className="filter-label">Show</span>
+        <div className="owner-seg">
+          <button className={ownerFilter === 'all' ? 'active' : ''}
+            onClick={() => setOwnerFilter('all')}>Everyone</button>
+          {OWNERS.map(o => (
+            <button key={o}
+              className={ownerFilter === o ? 'active' : ''}
+              onClick={() => setOwnerFilter(o)}>
+              {o === currentOwner ? 'Mine' : o.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Mobile stage tabs */}
       <div className="stage-tabs">
@@ -159,7 +214,7 @@ export default function KanbanBoard({ session }) {
           >
             {stage.id}
             <span className="stage-tab-count">
-              {deals.filter(d => d.stage === stage.id).length}
+              {visibleDeals.filter(d => d.stage === stage.id).length}
             </span>
           </button>
         ))}
@@ -172,11 +227,11 @@ export default function KanbanBoard({ session }) {
             <KanbanColumn
               key={stage.id}
               stage={stage}
-              deals={deals.filter(d => d.stage === stage.id)}
+              deals={visibleDeals.filter(d => d.stage === stage.id)}
               onAddDeal={() => setModal({ type: 'add', stage: stage.id })}
               onOpenDeal={deal => setModal({ type: 'detail', deal })}
               onDragStart={onDragStart}
-              onDrop={onDrop}
+              onReorder={reorderDeal}
               dragId={dragId}
               companyTotals={companyTotals}
               isMobileActive={activeStage === stage.id}
