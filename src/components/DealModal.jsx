@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { STAGES, OWNERS, OWNER_STYLES, ENGAGEMENT_TYPES, fmtDate, fmtEur } from './KanbanBoard'
+import { STAGES, OWNERS, ENGAGEMENT_TYPES, fmtEur } from './KanbanBoard'
 
 const PROSPECT_STAGES = ['Lead', 'Contacted', 'Proposal sent', 'Negotiation']
 
@@ -20,8 +20,81 @@ function ValueFields({ stage, projectedValue, onChange }) {
   )
 }
 
-// ── Add / Edit form ──
-function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies = [] }) {
+// ── Project history (company-level). Note: no nested <form> — this lives
+// inside the deal form, so buttons are type="button" and Enter is handled. ──
+function ProjectHistory({ company, projects, onAdd, onDelete }) {
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState({ name: '', value: '', year: '' })
+  const total = projects.reduce((s, p) => s + (parseFloat(p.value) || 0), 0)
+
+  function submit() {
+    if (!draft.name.trim()) return
+    onAdd(company, {
+      name:  draft.name.trim(),
+      value: draft.value !== '' ? parseFloat(draft.value) : 0,
+      year:  draft.year  !== '' ? parseInt(draft.year, 10) : null,
+    })
+    setDraft({ name: '', value: '', year: '' })
+    setAdding(false)
+  }
+  function onKey(e) { if (e.key === 'Enter') { e.preventDefault(); submit() } }
+
+  return (
+    <>
+      <div className="section-label" style={{ marginTop: 14 }}>Project history</div>
+
+      {projects.length === 0 && !adding && (
+        <div className="proj-empty">No projects logged yet.</div>
+      )}
+
+      {projects.length > 0 && (
+        <div className="proj-list">
+          {projects.map(p => (
+            <div className="proj-row" key={p.id}>
+              <div className="proj-main">
+                <span className="proj-name">{p.name}</span>
+                {p.year && <span className="proj-year">{p.year}</span>}
+              </div>
+              <div className="proj-right">
+                <span className="proj-value">{fmtEur(p.value) || '€0'}</span>
+                <button type="button" className="proj-del" onClick={() => onDelete(p.id)} title="Remove project">×</button>
+              </div>
+            </div>
+          ))}
+          <div className="proj-total">
+            <span>Total value</span>
+            <span>{fmtEur(total) || '€0'}</span>
+          </div>
+        </div>
+      )}
+
+      {adding ? (
+        <div className="proj-add-form">
+          <input autoFocus placeholder="Project name" value={draft.name} onKeyDown={onKey}
+            onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
+          <div className="proj-add-row">
+            <input type="number" min="0" placeholder="€ value" value={draft.value} onKeyDown={onKey}
+              onChange={e => setDraft(d => ({ ...d, value: e.target.value }))} />
+            <input type="number" placeholder="Year" value={draft.year} onKeyDown={onKey}
+              onChange={e => setDraft(d => ({ ...d, year: e.target.value }))} />
+          </div>
+          <div className="proj-add-actions">
+            <button type="button" className="btn-cancel" onClick={() => { setAdding(false); setDraft({ name: '', value: '', year: '' }) }}>Cancel</button>
+            <button type="button" className="btn-save" onClick={submit}>Add project</button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="add-here" style={{ marginTop: 6 }} onClick={() => setAdding(true)}>+ Add project</button>
+      )}
+    </>
+  )
+}
+
+// ── Add / Edit form (editing a card lands here directly) ──
+function DealForm({
+  initial, currentOwner, onSave, onCancel, isEdit, companies = [],
+  projects = [], onAddProject, onDeleteProject, onDelete,
+}) {
   const [fields, setFields] = useState({
     contact_person:  initial?.contact_person  ?? '',
     company:         initial?.company          ?? initial?.client_name ?? '',
@@ -35,13 +108,15 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies =
   })
   const [saving, setSaving] = useState(false)
 
+  // Project history is keyed on the saved company name.
+  const dealCompany = initial?.company || initial?.client_name
+
   function set(key, val) { setFields(f => ({ ...f, [key]: val })) }
 
   function handleStageChange(newStage) {
     setFields(f => ({
       ...f,
       stage:           newStage,
-      // Projected value only applies while it's still a prospect.
       projected_value: PROSPECT_STAGES.includes(newStage) ? f.projected_value : '',
     }))
   }
@@ -114,12 +189,6 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies =
         onChange={set}
       />
 
-      {fields.stage === 'Active client' && (
-        <div className="form-hint" style={{ margin: '-2px 0 12px' }}>
-          Log delivered projects & their value from the client's detail view after saving.
-        </div>
-      )}
-
       <div className="form-group">
         <label>Last contacted</label>
         <input type="date" value={fields.last_contacted}
@@ -132,7 +201,21 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies =
           placeholder="What's the next step?" />
       </div>
 
+      {isEdit && dealCompany && (
+        <ProjectHistory
+          company={dealCompany}
+          projects={projects}
+          onAdd={onAddProject}
+          onDelete={onDeleteProject}
+        />
+      )}
+
       <div className="modal-actions">
+        {isEdit && (
+          <button type="button" className="del-btn" style={{ marginRight: 'auto' }} onClick={onDelete}>
+            Remove
+          </button>
+        )}
         <button type="button" className="btn-cancel" onClick={onCancel}>Cancel</button>
         <button type="submit" className="btn-save" disabled={saving}>
           {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add contact'}
@@ -142,190 +225,36 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies =
   )
 }
 
-// ── Project history (company-level, shown in the detail view) ──
-function ProjectHistory({ company, projects, onAdd, onDelete }) {
-  const [adding, setAdding] = useState(false)
-  const [draft, setDraft] = useState({ name: '', value: '', year: '' })
-  const total = projects.reduce((s, p) => s + (parseFloat(p.value) || 0), 0)
-
-  function submit(e) {
-    e.preventDefault()
-    if (!draft.name.trim()) return
-    onAdd(company, {
-      name:  draft.name.trim(),
-      value: draft.value !== '' ? parseFloat(draft.value) : 0,
-      year:  draft.year  !== '' ? parseInt(draft.year, 10) : null,
-    })
-    setDraft({ name: '', value: '', year: '' })
-    setAdding(false)
-  }
-
-  return (
-    <>
-      <div className="section-label" style={{ marginTop: 14 }}>Project history</div>
-
-      {projects.length === 0 && !adding && (
-        <div className="proj-empty">No projects logged yet.</div>
-      )}
-
-      {projects.length > 0 && (
-        <div className="proj-list">
-          {projects.map(p => (
-            <div className="proj-row" key={p.id}>
-              <div className="proj-main">
-                <span className="proj-name">{p.name}</span>
-                {p.year && <span className="proj-year">{p.year}</span>}
-              </div>
-              <div className="proj-right">
-                <span className="proj-value">{fmtEur(p.value) || '€0'}</span>
-                <button className="proj-del" onClick={() => onDelete(p.id)} title="Remove project">×</button>
-              </div>
-            </div>
-          ))}
-          <div className="proj-total">
-            <span>Total value</span>
-            <span>{fmtEur(total) || '€0'}</span>
-          </div>
-        </div>
-      )}
-
-      {adding ? (
-        <form className="proj-add-form" onSubmit={submit}>
-          <input autoFocus placeholder="Project name" value={draft.name}
-            onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
-          <div className="proj-add-row">
-            <input type="number" min="0" placeholder="€ value" value={draft.value}
-              onChange={e => setDraft(d => ({ ...d, value: e.target.value }))} />
-            <input type="number" placeholder="Year" value={draft.year}
-              onChange={e => setDraft(d => ({ ...d, year: e.target.value }))} />
-          </div>
-          <div className="proj-add-actions">
-            <button type="button" className="btn-cancel" onClick={() => { setAdding(false); setDraft({ name: '', value: '', year: '' }) }}>Cancel</button>
-            <button type="submit" className="btn-save">Add project</button>
-          </div>
-        </form>
-      ) : (
-        <button className="add-here" style={{ marginTop: 6 }} onClick={() => setAdding(true)}>+ Add project</button>
-      )}
-    </>
-  )
-}
-
-// ── Detail view ──
-function DealDetail({ deal, projects, onClose, onEdit, onMove, onDelete, onAddProject, onDeleteProject }) {
-  const stage      = STAGES.find(s => s.id === deal.stage) || STAGES[0]
-  const ownerStyle = OWNER_STYLES[deal.owner] || OWNER_STYLES['Henrik Axlund']
-  const others     = STAGES.filter(s => s.id !== deal.stage)
-  const pv = fmtEur(deal.projected_value)
-
-  return (
-    <>
-      <div className="detail-flex">
-        <div className="detail-header">
-          <div className="detail-name">{deal.company || deal.client_name}</div>
-          {deal.contact_person && <div className="detail-contact">{deal.contact_person}</div>}
-          {deal.opportunity && <div className="detail-opp">{deal.opportunity}</div>}
-          <span
-            className="detail-stage-pill"
-            style={{ background: stage.bg, color: stage.color }}
-          >
-            {stage.id}
-          </span>
-        </div>
-        <button className="detail-close" onClick={onClose}>×</button>
-      </div>
-
-      <div className="field-list">
-        {deal.engagement_type && (
-          <div className="field-item">
-            <span className="fi-label">Engagement</span>
-            <span className="fi-val">{deal.engagement_type}</span>
-          </div>
-        )}
-        <div className="field-item">
-          <span className="fi-label">Owner</span>
-          <span className="fi-val" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <div
-              className="avatar"
-              style={{ background: ownerStyle.bg, color: ownerStyle.color, width: 22, height: 22, fontSize: 9 }}
-            >
-              {ownerStyle.initials}
-            </div>
-            {deal.owner}
-          </span>
-        </div>
-        <div className="field-item">
-          <span className="fi-label">Last contacted</span>
-          <span className="fi-val">{fmtDate(deal.last_contacted)}</span>
-        </div>
-      </div>
-
-      {pv && (
-        <div className="value-panel">
-          <div className="value-box projected">
-            <div className="value-box-label">Projected</div>
-            <div className="value-box-amount">{pv}</div>
-          </div>
-        </div>
-      )}
-
-      {deal.next_action && (
-        <>
-          <div className="section-label">Next action</div>
-          <div className="next-action-box">→ {deal.next_action}</div>
-        </>
-      )}
-
-      <ProjectHistory
-        company={deal.company || deal.client_name}
-        projects={projects}
-        onAdd={onAddProject}
-        onDelete={onDeleteProject}
-      />
-
-      <div className="section-label" style={{ marginTop: 14 }}>Move to stage</div>
-      <div className="move-grid">
-        {others.map(s => (
-          <button key={s.id} className="move-btn" onClick={() => onMove(deal.id, s.id)}>
-            {s.id}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-        <button className="move-btn" onClick={() => onEdit(deal)}>Edit</button>
-        <button className="del-btn"  onClick={() => onDelete(deal.id)}>Remove</button>
-      </div>
-    </>
-  )
-}
-
 // ── Root modal wrapper ──
 export default function DealModal({
   modal, currentOwner, companies = [], projects = [],
-  onClose, onCreate, onUpdate, onMove, onDelete, onAddProject, onDeleteProject,
+  onClose, onCreate, onUpdate, onDelete, onAddProject, onDeleteProject,
 }) {
-  const [view, setView] = useState(modal.type) // 'add' | 'edit' | 'detail'
-  const [editDeal, setEditDeal] = useState(modal.deal || null)
-
-  function handleEdit(deal) {
-    setEditDeal(deal)
-    setView('edit')
-  }
-
-  const isDetail = view === 'detail'
-  const dealCompany = modal.deal?.company || modal.deal?.client_name
+  const isEdit = modal.type === 'detail' || modal.type === 'edit'
+  const deal = modal.deal
+  const dealCompany = deal?.company || deal?.client_name
   const companyProjects = projects.filter(p => p.company === dealCompany)
-  const title = view === 'add' ? 'New contact'
-              : view === 'edit' ? `Edit — ${editDeal?.company || editDeal?.client_name}`
-              : null
+  const title = isEdit ? (dealCompany || 'Edit contact') : 'New contact'
 
   return createPortal(
     <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className={`modal${isDetail ? ' detail-modal' : ''}`}>
-        {title && <div className="modal-title">{title}</div>}
+      <div className="modal detail-modal">
+        <div className="modal-title">{title}</div>
 
-        {view === 'add' && (
+        {isEdit && deal ? (
+          <DealForm
+            currentOwner={currentOwner}
+            companies={companies}
+            initial={deal}
+            projects={companyProjects}
+            onSave={fields => onUpdate(deal.id, fields)}
+            onCancel={onClose}
+            onDelete={() => onDelete(deal.id)}
+            onAddProject={onAddProject}
+            onDeleteProject={onDeleteProject}
+            isEdit
+          />
+        ) : (
           <DealForm
             currentOwner={currentOwner}
             companies={companies}
@@ -333,30 +262,6 @@ export default function DealModal({
             onSave={onCreate}
             onCancel={onClose}
             isEdit={false}
-          />
-        )}
-
-        {view === 'edit' && editDeal && (
-          <DealForm
-            currentOwner={currentOwner}
-            companies={companies}
-            initial={editDeal}
-            onSave={fields => onUpdate(editDeal.id, fields)}
-            onCancel={onClose}
-            isEdit
-          />
-        )}
-
-        {view === 'detail' && modal.deal && (
-          <DealDetail
-            deal={modal.deal}
-            projects={companyProjects}
-            onClose={onClose}
-            onEdit={handleEdit}
-            onMove={onMove}
-            onDelete={onDelete}
-            onAddProject={onAddProject}
-            onDeleteProject={onDeleteProject}
           />
         )}
       </div>

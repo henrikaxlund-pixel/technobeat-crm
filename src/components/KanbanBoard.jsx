@@ -95,11 +95,6 @@ export default function KanbanBoard({ session }) {
     else setModal(null)
   }
 
-  async function moveDeal(id, stage) {
-    await supabase.from('deals').update({ stage }).eq('id', id)
-    setModal(null)
-  }
-
   async function deleteDeal(id) {
     if (!confirm('Remove this deal from the pipeline?')) return
     await supabase.from('deals').delete().eq('id', id)
@@ -251,7 +246,6 @@ export default function KanbanBoard({ session }) {
           onClose={() => setModal(null)}
           onCreate={createDeal}
           onUpdate={updateDeal}
-          onMove={moveDeal}
           onDelete={deleteDeal}
           onAddProject={addProject}
           onDeleteProject={deleteProject}
