@@ -96,6 +96,7 @@ export default function KanbanBoard({ session }) {
   }
 
   const activeStageObj = STAGES.find(s => s.id === activeStage)
+  const companies = [...new Set(deals.map(d => d.company || d.client_name).filter(Boolean))].sort()
 
   return (
     <div>
@@ -159,6 +160,7 @@ export default function KanbanBoard({ session }) {
             ? { ...modal, deal: deals.find(d => d.id === modal.deal?.id) || modal.deal }
             : modal}
           currentOwner={currentOwner}
+          companies={companies}
           onClose={() => setModal(null)}
           onCreate={createDeal}
           onUpdate={updateDeal}

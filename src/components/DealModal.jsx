@@ -46,11 +46,12 @@ function ValueFields({ stage, projectedValue, soldValue, onChange }) {
 }
 
 // ── Add / Edit form ──
-function DealForm({ initial, currentOwner, onSave, onCancel, isEdit }) {
+function DealForm({ initial, currentOwner, onSave, onCancel, isEdit, companies = [] }) {
   const [fields, setFields] = useState({
-    client_name:     initial?.client_name     ?? '',
+    company:         initial?.company         ?? initial?.client_name ?? '',
     opportunity:     initial?.opportunity     ?? '',
     contact_person:  initial?.contact_person  ?? '',
+    engagement_type: initial?.engagement_type ?? '',
     owner:           initial?.owner           ?? currentOwner,
     stage:           initial?.stage           ?? 'Lead',
     last_contacted:  initial?.last_contacted  ?? '',
@@ -76,10 +77,12 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!fields.client_name.trim()) return
+    if (!fields.company.trim()) return
     setSaving(true)
     const payload = {
       ...fields,
+      company:         fields.company.trim(),
+      client_name:     fields.company.trim(), // keep legacy headline in sync
       projected_value: fields.projected_value !== '' ? parseFloat(fields.projected_value) : null,
       sold_value:      fields.sold_value      !== '' ? parseFloat(fields.sold_value)      : null,
       last_contacted:  fields.last_contacted  || null,
@@ -91,9 +94,20 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit }) {
   return (
     <form onSubmit={handleSubmit}>
       <div className="form-group">
-        <label>Client / company</label>
-        <input type="text" value={fields.client_name} autoFocus required
-          onChange={e => set('client_name', e.target.value)} placeholder="e.g. Stora Enso" />
+        <label>Company</label>
+        <input type="text" value={fields.company} autoFocus required list="company-list"
+          onChange={e => set('company', e.target.value)} placeholder="e.g. ICEYE" />
+        {companies.length > 0 && (
+          <datalist id="company-list">
+            {companies.map(c => <option key={c} value={c} />)}
+          </datalist>
+        )}
+        <div className="form-hint">Contacts sharing a company are grouped together</div>
+      </div>
+      <div className="form-group">
+        <label>Contact person</label>
+        <input type="text" value={fields.contact_person}
+          onChange={e => set('contact_person', e.target.value)} placeholder="e.g. Hina Atta" />
       </div>
       <div className="form-group">
         <label>Opportunity / project</label>
@@ -101,9 +115,16 @@ function DealForm({ initial, currentOwner, onSave, onCancel, isEdit }) {
           onChange={e => set('opportunity', e.target.value)} placeholder="e.g. Website redesign" />
       </div>
       <div className="form-group">
-        <label>Contact person</label>
-        <input type="text" value={fields.contact_person}
-          onChange={e => set('contact_person', e.target.value)} placeholder="Name" />
+        <label>Engagement type</label>
+        <input type="text" value={fields.engagement_type} list="engagement-list"
+          onChange={e => set('engagement_type', e.target.value)}
+          placeholder="e.g. Project based / Fractional" />
+        <datalist id="engagement-list">
+          <option value="Project based" />
+          <option value="Fractional" />
+          <option value="Project based / Fractional" />
+          <option value="Retainer" />
+        </datalist>
       </div>
 
       <div className="form-row">
@@ -162,7 +183,7 @@ function DealDetail({ deal, onClose, onEdit, onMove, onDelete }) {
     <>
       <div className="detail-flex">
         <div className="detail-header">
-          <div className="detail-name">{deal.client_name}</div>
+          <div className="detail-name">{deal.company || deal.client_name}</div>
           {deal.opportunity && <div className="detail-opp">{deal.opportunity}</div>}
           <span
             className="detail-stage-pill"
@@ -179,6 +200,12 @@ function DealDetail({ deal, onClose, onEdit, onMove, onDelete }) {
           <span className="fi-label">Contact</span>
           <span className="fi-val">{deal.contact_person || '—'}</span>
         </div>
+        {deal.engagement_type && (
+          <div className="field-item">
+            <span className="fi-label">Engagement</span>
+            <span className="fi-val">{deal.engagement_type}</span>
+          </div>
+        )}
         <div className="field-item">
           <span className="fi-label">Owner</span>
           <span className="fi-val" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -239,7 +266,7 @@ function DealDetail({ deal, onClose, onEdit, onMove, onDelete }) {
 }
 
 // ── Root modal wrapper ──
-export default function DealModal({ modal, currentOwner, onClose, onCreate, onUpdate, onMove, onDelete }) {
+export default function DealModal({ modal, currentOwner, companies = [], onClose, onCreate, onUpdate, onMove, onDelete }) {
   const [view, setView] = useState(modal.type) // 'add' | 'edit' | 'detail'
   const [editDeal, setEditDeal] = useState(modal.deal || null)
 
@@ -259,6 +286,7 @@ export default function DealModal({ modal, currentOwner, onClose, onCreate, onUp
         {view === 'add' && (
           <DealForm
             currentOwner={currentOwner}
+            companies={companies}
             initial={{ stage: modal.stage || 'Lead' }}
             onSave={onCreate}
             onCancel={onClose}
@@ -269,6 +297,7 @@ export default function DealModal({ modal, currentOwner, onClose, onCreate, onUp
         {view === 'edit' && editDeal && (
           <DealForm
             currentOwner={currentOwner}
+            companies={companies}
             initial={editDeal}
             onSave={fields => onUpdate(editDeal.id, fields)}
             onCancel={onClose}

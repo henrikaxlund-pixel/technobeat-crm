@@ -1,0 +1,31 @@
+name: Supabase keep-alive
+
+# Free Supabase projects pause after ~1 week of inactivity.
+# This pings the REST API every 3 days so the project never goes idle.
+# Reuses the same secrets as the deploy workflow.
+
+on:
+  schedule:
+    - cron: '17 6 */3 * *'   # 06:17 UTC, every 3rd day
+  workflow_dispatch:          # lets you run it manually from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL:      ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY secrets — skipping."
+            exit 1
+          fi
+          echo "Pinging $SUPABASE_URL ..."
+          curl --fail --silent --show-error \
+            "$SUPABASE_URL/rest/v1/deals?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -o /dev/null
+          echo "Keep-alive ping OK."

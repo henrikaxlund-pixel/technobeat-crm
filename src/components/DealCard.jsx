@@ -13,9 +13,10 @@ export default function DealCard({ deal, onClick, onDragStart, isDragging }) {
       onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
       onClick={onClick}
     >
-      <div className="card-name">{deal.client_name}</div>
-      {deal.opportunity   && <div className="card-opp">{deal.opportunity}</div>}
+      <div className="card-name">{deal.company || deal.client_name}</div>
       {deal.contact_person && <div className="card-contact">{deal.contact_person}</div>}
+      {deal.opportunity    && <div className="card-opp">{deal.opportunity}</div>}
+      {deal.engagement_type && <span className="card-engagement">{deal.engagement_type}</span>}
 
       <div className="card-row">
         <span className="card-date">{fmtDate(deal.last_contacted)}</span>
